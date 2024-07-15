@@ -20,6 +20,7 @@
 	
 	<ItemGroup>
 		<None Include="..\..\.editorconfig" Link=".editorconfig" />
+		<None Include="Ragdoll.csproj.user" />
 	</ItemGroup>
 
     <!-- Enable Nullable for better IDE null-checking -->
@@ -74,6 +75,24 @@
 
     <!-- Netcode Patcher Post-Build Event -->
     <Target Name="NetcodePatch" AfterTargets="PostBuildEvent">
-        <Exec Command="dotnet netcode-patch &quot;$(TargetPath)&quot; @(ReferencePathWithRefAssemblies->'&quot;%(Identity)&quot;', ' ')"/>
+        <Exec Command="netcode-patch &quot;$(TargetPath)&quot; @(ReferencePathWithRefAssemblies->'&quot;%(Identity)&quot;', ' ')"/>
     </Target>
+	
+	<!-- Copy to Folders Post-Build Event -->
+	<Target Name="CopyToPublish" AfterTargets="NetcodePatch" Condition="true">
+		<MakeDir Directories="$(TargetDir)publish" Condition="!Exists('$(TargetDir)publish')" />
+		<Exec Command="cp -r $(UNITY)/AssetBundleBrowser/ragdoll $(TargetDir)publish/" />
+		<Exec Command="cp -r $(TargetDir)Ragdoll.dll $(TargetDir)publish/" />
+		<Exec Command="cp $(SolutionDir)CHANGELOG.md $(TargetDir)publish/" />
+		<Exec Command="cp $(SolutionDir)README.md $(TargetDir)publish/" />
+	</Target>
+	<Target Name="CopyToUnity" AfterTargets="CopyToPublish" Condition="true">
+		<Exec Command="cp -r $(TargetDir)Ragdoll.dll $(UNITY)/Ragdoll/" />
+	</Target>
+
+	<Target Name="CopyToProfile" AfterTargets="CopyToUnity" Condition="true">
+		<Exec Command="cp -r $(TargetDir)publish/. &quot;$(R2MM_PATH)/profiles/$(R2MM_PROFILE)/BepInEx/plugins/$(MODNAME)/&quot;" />
+		<Exec Command="cp -r $(TargetDir)publish/. &quot;$(R2MM_PATH)/cache/$(MODNAME)/1.0.0/&quot;" />
+	</Target>
+	
 </Project>

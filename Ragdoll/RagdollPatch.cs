@@ -2,31 +2,52 @@
 using UnityEngine;
 using System.Linq;
 using GameNetcodeStuff;
+using UnityEngine.Assertions;
 
 namespace Ragdoll
 {
 	public static class RagdollPatch
 	{
-		public static bool cacheRan = false;
 		public static GameObject ragSpinePrefab;
 
 		internal static void Patch()
 		{
+			ragSpinePrefab = P.assets.LoadAsset<GameObject>("Assets/Ragdoll/spineRagdoll.prefab");
+			// PlayerControllerB
 			On.GameNetcodeStuff.PlayerControllerB.ConnectClientToPlayerObject += CacheBonesOnConnectPatch;
 			On.GameNetcodeStuff.PlayerControllerB.Awake += PlayerControllerB_Awake;
+
+			// DeadBodyInfo
+			// DeadBodyInfo override
+
+			// RagdollGrabbableObject
+			On.RagdollGrabbableObject.EquipItem += TemporaryPatch;
+
+			// PlayerPhysicsRegion
 		}
 
+		private static void TemporaryPatch(On.RagdollGrabbableObject.orig_EquipItem orig, RagdollGrabbableObject self)
+		{
+			if (self.ragdoll is RagdollController) { (self.ragdoll as RagdollController).SwapToRagdoll(); }
+			orig(self);
+		}
+
+		#region PlayerControllerB
 		private static void PlayerControllerB_Awake(On.GameNetcodeStuff.PlayerControllerB.orig_Awake orig, PlayerControllerB self)
 		{
 			orig(self);
 
 			GameObject ragSpine = GameObject.Instantiate(ragSpinePrefab);
-			ragSpine.transform.SetParent(self.playerModelArmsMetarig);
+			ragSpine.GetComponent<RagdollController>().playerObjectId = (int)self.playerClientId;
+			ragSpine.transform.SetParent(self.thisPlayerModel.rootBone.parent);
+			P.Log("added ragSpine to player " + self.playerClientId);
+			
 		}
 
 		private static void CacheBonesOnConnectPatch(On.GameNetcodeStuff.PlayerControllerB.orig_ConnectClientToPlayerObject orig, PlayerControllerB self)
 		{
 			orig(self);
+			P.Log("caching bones for " + self.playerClientId);
 			RagdollController.localRagScript = GameNetworkManager.Instance.localPlayerController.GetComponentInChildren<RagdollController>();
 			RagdollController.localRagScript.playerScript = GameNetworkManager.Instance.localPlayerController;
 			RagdollController.localRagScript.playerModel = GameNetworkManager.Instance.localPlayerController.thisPlayerModel;
@@ -35,32 +56,25 @@ namespace Ragdoll
 			RagdollController.localPlayerRagBones = RagdollController.localRagScript.ragdollModel.bones;
 
 			for (int i = 0; i < StartOfRound.Instance.allPlayerScripts.Length; i++) {
-				RagdollController.allPlayerRagScripts[i] = StartOfRound.Instance.allPlayerScripts[i].GetComponentInChildren<RagdollController>();
-				RagdollController.allPlayerRagScripts[i].playerScript = StartOfRound.Instance.allPlayerScripts[i];
-				RagdollController.allPlayerRagScripts[i].playerModel = StartOfRound.Instance.allPlayerScripts[i].thisPlayerModel;
-				RagdollController.allPlayerAnimBones[i] = StartOfRound.Instance.allPlayerScripts[i].thisPlayerModel.bones;
-				RagdollController.allPlayerRagBones[i] = RagdollController.allPlayerRagScripts[i].ragdollModel.bones;
-			}
-			cacheRan = true;
-		}
+				PlayerControllerB pl = StartOfRound.Instance.allPlayerScripts[i];
+				RagdollController rag = pl.GetComponentInChildren<RagdollController>();
+				RagdollController.allPlayerRagScripts[i] = rag;
 
-		// thanks
-		public static void Apply(SkinnedMeshRenderer sourceSkin, SkinnedMeshRenderer targetSkin)
-		{
+				rag.playerScript = pl;
+				rag.playerModel = pl.thisPlayerModel;
 
-			
-			Transform[] newBones = new Transform[targetSkin.bones.Length];
-			Dictionary<string, Transform> boneCache = sourceSkin.bones.ToDictionary((Transform bone) => (bone.name), (Transform bone) => bone);
-			List<string> missingBones = new List<string>();
-			for (int i = 0; i < targetSkin.bones.Length; i++)
-			{
-				if (boneCache.ContainsKey(targetSkin.bones[i].name))
-				{
-					newBones[i] = boneCache[targetSkin.bones[i].name];
-				}
+				RagdollController.allPlayerAnimBones[i] = pl.thisPlayerModel.bones;
+				RagdollController.allPlayerRagBones[i] = rag.ragdollModel.bones;
+
+				rag.animBones = pl.thisPlayerModel.bones;
+				rag.ragBones = rag.ragdollModel.bones;
+
+				pl.playerBodyAnimator.keepAnimatorStateOnDisable = true; // https://docs.unity3d.com/ScriptReference/Animator-keepAnimatorStateOnDisable.html
+
+				rag.FalseStart();
+				rag.active = true;
 			}
-			targetSkin.bones = newBones;
-			
 		}
+		#endregion
 	}
 }

@@ -11,10 +11,12 @@ namespace Ragdoll
 	[BepInPlugin(MyPluginInfo.PLUGIN_GUID, MyPluginInfo.PLUGIN_NAME, MyPluginInfo.PLUGIN_VERSION)]
 	public class P : BaseUnityPlugin
 	{
-		public static P Instance { get; private set; } = null!;
+		public static P Instance;
+		public static AssetBundle assets;
 		private void Awake()
 		{
 			Instance = this;
+			assets = AssetBundle.LoadFromFile(Path.Combine(Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location), "ragdoll"));
 
 			NetcodePatcher();
 			RagdollPatch.Patch();
