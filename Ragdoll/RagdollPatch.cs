@@ -21,15 +21,8 @@ namespace Ragdoll
 			// DeadBodyInfo override
 
 			// RagdollGrabbableObject
-			On.RagdollGrabbableObject.EquipItem += TemporaryPatch;
 
 			// PlayerPhysicsRegion
-		}
-
-		private static void TemporaryPatch(On.RagdollGrabbableObject.orig_EquipItem orig, RagdollGrabbableObject self)
-		{
-			if (self.ragdoll is RagdollController) { (self.ragdoll as RagdollController).SwapToRagdoll(); }
-			orig(self);
 		}
 
 		#region PlayerControllerB
@@ -71,8 +64,7 @@ namespace Ragdoll
 
 				pl.playerBodyAnimator.keepAnimatorStateOnDisable = true; // https://docs.unity3d.com/ScriptReference/Animator-keepAnimatorStateOnDisable.html
 
-				rag.FalseStart();
-				rag.active = true;
+				rag.Initialize();
 			}
 		}
 		#endregion
